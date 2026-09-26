@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: secret-control-server
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 -k gevent -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: SECRET_ADMIN_TOKEN
+        sync: false
+      - key: SECRET_DEVICE_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
